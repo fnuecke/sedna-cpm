@@ -1,0 +1,398 @@
+; CBIOS for the sedna Z80 board.
+;
+; The only address baked in is the device enumeration window. Everything else -- console, boot ROM
+; latch, disk controllers -- is discovered through it at boot, so the same ROM runs on any board
+; that maps its devices anywhere.
+;
+; The system image lives in the boot ROM rather than on reserved tracks, so warm boot re-maps the
+; ROM and copies CCP+BDOS back. The BIOS is deliberately not re-copied: it holds the discovered
+; port numbers, and reloading it would throw them away.
+;
+; `in r,(c)` / `out (c),r` put B on A8-A15, which the board's port map ignores -- that is what makes
+; runtime-discovered ports free on a Z80.
+
+	cpu	z80
+	page	0
+
+CCP	equ	0E200h
+BDOSE	equ	0EA06h		; the first six bytes of the BDOS image are its serial number
+BIOS	equ	0F800h
+
+ROMBASE	equ	0200h		; system image within the boot ROM
+ROMLEN	equ	BIOS-CCP	; CCP + BDOS only; the BIOS stays resident
+
+IOBYTE	equ	0003h
+CDISK	equ	0004h
+
+; ---------------------------------------------------------------- device registers
+
+LSRDR	equ	01h		; UART line status: data ready
+LSRTHRE	equ	20h		; UART line status: transmit holding register empty
+
+FSEEK	equ	10h
+FREAD	equ	80h
+FWRITE	equ	0A0h
+FBUSY	equ	01h
+; A Type I (seek) status reports write protect and track 00 as information, not as errors; only a
+; transfer status may be tested for the full set.
+FNRDY	equ	80h		; status: nothing in the selected drive
+FERRI	equ	90h		; seek errors: not ready | seek error
+FERR	equ	0D4h		; transfer errors: not ready | write protected | not found | lost data
+
+SECSZ	equ	128
+SPT	equ	32
+NDRV	equ	4		; drive letters we are willing to hand out
+
+	org	BIOS
+
+	jp	BOOT
+WBOOTE:	jp	WBOOT
+	jp	CONST
+	jp	CONIN
+	jp	CONOUT
+	jp	LIST
+	jp	PUNCH
+	jp	READER
+	jp	HOME
+	jp	SELDSK
+	jp	SETTRK
+	jp	SETSEC
+	jp	SETDMA
+	jp	READ
+	jp	WRITE
+	jp	LISTST
+	jp	SECTRAN
+
+	include	"devlib.inc"	; window layout and DEVFIND, shared with guest programs
+
+; ---------------------------------------------------------------------- boot
+
+BOOT:	di
+	ld	sp,STACK
+	call	DISCOVER
+	ld	a,(LATCHP)	; drop the boot ROM; this code already runs above it
+	ld	c,a
+	xor	a
+	out	(c),a
+	ld	(IOBYTE),a
+	ld	(CDISK),a
+	jr	GOCPM
+
+WBOOT:	di
+	ld	sp,STACK
+	ld	a,(LATCHP)
+	ld	c,a
+	ld	a,1
+	out	(c),a		; map the ROM back in to re-read CCP and BDOS
+	ld	hl,ROMBASE
+	ld	de,CCP
+	ld	bc,ROMLEN
+	ldir
+	ld	a,(LATCHP)
+	ld	c,a
+	xor	a
+	out	(c),a
+
+GOCPM:	ld	a,0C3h		; JP
+	ld	(0000h),a
+	ld	hl,WBOOTE
+	ld	(0001h),hl
+	ld	(0005h),a
+	ld	hl,BDOSE
+	ld	(0006h),hl
+	ld	a,3		; a TPA program may have left the divisor latch open
+	call	UREG
+	ld	a,3		; 8N1, DLAB clear
+	out	(c),a
+	ld	bc,0080h
+	call	SETDMA
+	ld	a,(CDISK)
+	ld	c,a
+	jp	CCP
+
+; ------------------------------------------------------------------ discovery
+
+DISCOVER:
+	ld	c,CLSROM
+	ld	b,0
+	call	DEVFIND
+	jr	c,NODEV
+	ld	(LATCHP),a
+
+	ld	c,CLSCHR
+	ld	b,0
+	call	DEVFIND
+	jr	c,NODEV
+	ld	(UARTB),a
+
+	; Every block device becomes the next drive letter, in enumeration order. A controller with
+	; several drives reports one entry per drive, distinguished by the unit in the attribute byte.
+	ld	b,0
+DISC1:	push	bc
+	ld	c,CLSBLK
+	call	DEVFIND
+	pop	bc
+	jr	c,DISC2
+	ld	e,b
+	ld	d,0
+	ld	hl,DRVPRT
+	add	hl,de
+	ld	(hl),a		; controller port
+	in	a,(BATT)
+	and	0Fh		; low nibble selects the drive on that controller
+	ld	hl,DRVUNI
+	add	hl,de
+	ld	(hl),a
+	inc	b
+	ld	a,b
+	cp	NDRV
+	jr	c,DISC1
+DISC2:	ld	a,b
+	ld	(DRVCNT),a
+	ret
+
+; DEVFIND returns the device count in A when it fails, so storing it unchecked would leave the BIOS
+; driving whatever sits at that port. Without a console or a way to unmap the ROM, stop instead.
+NODEV:	di
+	halt
+
+; ------------------------------------------------------------------- console
+
+; Returns the UART register at offset A in C.
+UREG:	ld	hl,UARTB
+	add	a,(hl)
+	ld	c,a
+	ret
+
+CONST:	ld	a,5
+	call	UREG
+	in	a,(c)
+	and	LSRDR
+	ret	z
+	ld	a,0FFh
+	ret
+
+CONIN:	ld	a,5
+	call	UREG
+CONI1:	in	a,(c)
+	and	LSRDR
+	jr	z,CONI1
+	xor	a
+	call	UREG
+	in	a,(c)
+	and	7Fh
+	ret
+
+CONOUT:	ld	b,c		; hold the character; C is about to become a port
+	ld	a,5
+	call	UREG
+CONO1:	in	a,(c)
+	and	LSRTHRE
+	jr	z,CONO1
+	xor	a
+	call	UREG
+	out	(c),b
+	ret
+
+LIST:	jp	CONOUT
+
+LISTST:	ld	a,0FFh		; LIST is the console, which is always ready
+	ret
+
+PUNCH:	ret
+
+READER:	ld	a,1Ah
+	ret
+
+; ---------------------------------------------------------------------- disk
+
+HOME:	ld	bc,0
+SETTRK:	ld	(TRACK),bc
+	ret
+
+SETSEC:	ld	(SECTOR),bc
+	ret
+
+SETDMA:	ld	(DMAADR),bc
+	ret
+
+SECTRAN:			; no skew, so the logical sector is the physical one
+	ld	h,b
+	ld	l,c
+	ret
+
+SELDSK:	ld	a,(DRVCNT)
+	cp	c
+	jr	c,SELNONE	; drive letter past the last discovered device
+	jr	z,SELNONE
+	ld	a,c
+	ld	(DRIVE),a
+
+	ld	e,a		; latch the controller and unit this drive lives on
+	ld	d,0
+	ld	hl,DRVPRT
+	add	hl,de
+	ld	a,(hl)
+	ld	(FDCB),a
+	ld	hl,DRVUNI
+	add	hl,de
+	ld	a,(hl)
+	ld	(FUNIT),a
+
+	call	FSEL		; a drive with nothing in it is not an error, it is not selectable
+	xor	a
+	call	FREG
+	in	a,(c)
+	and	FNRDY
+	jr	nz,SELNONE
+
+	ld	a,(DRIVE)	; DPH = DPHS + drive * 16
+	add	a,a
+	add	a,a
+	add	a,a
+	add	a,a
+	ld	e,a
+	ld	d,0
+	ld	hl,DPHS
+	add	hl,de
+	ret
+
+SELNONE:
+	ld	hl,0
+	ret
+
+; Returns the disk controller register at offset A in C.
+FREG:	ld	hl,FDCB
+	add	a,(hl)
+	ld	c,a
+	ret
+
+; Waits for the controller to go idle, then returns its status register in A.
+FWAIT:	xor	a
+	call	FREG
+FW1:	in	a,(c)
+	bit	0,a		; FBUSY, tested without disturbing the status
+	jr	nz,FW1
+	ret
+
+; A failed command leaves the data register holding whatever was last written to it, so without
+; this check a read returns 128 copies of the track number and reports success.
+IOSTAT:	call	FWAIT
+	and	FERR
+	ret	z
+IOERR:	ld	a,1
+	ret
+
+; Selects the current drive on its controller, side 0.
+FSEL:	ld	a,4
+	call	FREG
+	ld	a,(FUNIT)
+	out	(c),a
+	ret
+
+; Exit Z on success, NZ if the controller reported an error.
+SEEK:	call	FSEL
+	ld	a,3
+	call	FREG
+	ld	a,(TRACK)
+	out	(c),a
+	xor	a
+	call	FREG
+	ld	a,FSEEK
+	out	(c),a
+	call	FWAIT
+	and	FERRI
+	ret	nz
+	ld	a,2
+	call	FREG
+	ld	a,(SECTOR)
+	inc	a		; the controller numbers sectors from one
+	out	(c),a
+	xor	a
+	ret
+
+READ:	call	SEEK
+	jr	nz,IOERR
+	xor	a
+	call	FREG
+	ld	a,FREAD
+	out	(c),a
+	ld	a,3
+	call	FREG
+	ld	hl,(DMAADR)
+	ld	b,SECSZ
+READ1:	in	a,(c)
+	ld	(hl),a
+	inc	hl
+	djnz	READ1
+	jp	IOSTAT
+
+WRITE:	call	SEEK
+	jr	nz,IOERR
+	xor	a
+	call	FREG
+	ld	a,FWRITE
+	out	(c),a
+	ld	a,3
+	call	FREG
+	ld	hl,(DMAADR)
+	ld	b,SECSZ
+WRITE1:	ld	a,(hl)
+	out	(c),a
+	inc	hl
+	djnz	WRITE1
+	jp	IOSTAT
+
+; ------------------------------------------------------------------ variables
+
+LATCHP:	db	0		; boot ROM latch port
+UARTB:	db	0		; console UART base port
+FDCB:	db	0		; controller port of the selected drive
+FUNIT:	db	0		; unit of the selected drive on that controller
+DRIVE:	db	0
+DRVCNT:	db	0
+DRVPRT:	ds	NDRV
+DRVUNI:	ds	NDRV
+
+TRACK:	dw	0
+SECTOR:	dw	0
+DMAADR:	dw	0080h
+
+DPHS:
+	dw	0,0,0,0,DIRBUF,DPB0,CSV0,ALV0
+	dw	0,0,0,0,DIRBUF,DPB0,CSV1,ALV1
+	dw	0,0,0,0,DIRBUF,DPB0,CSV2,ALV2
+	dw	0,0,0,0,DIRBUF,DPB0,CSV3,ALV3
+
+; Every discovered block device is assumed to carry the shipped floppy geometry; the window
+; reports no media type yet.
+DPB0:	dw	SPT
+	db	3		; BSH, 1 KiB blocks
+	db	7		; BLM
+	db	0		; EXM
+	dw	247		; DSM
+	dw	63		; DRM, 64 directory entries
+	db	0C0h		; AL0, two directory blocks
+	db	0		; AL1
+	dw	16		; CKS, (DRM+1)/4
+	dw	2		; OFF, two reserved tracks
+
+DIRBUF:	ds	128
+ALV0:	ds	31
+ALV1:	ds	31
+ALV2:	ds	31
+ALV3:	ds	31
+CSV0:	ds	16
+CSV1:	ds	16
+CSV2:	ds	16
+CSV3:	ds	16
+
+; SP wraps to FFFEh on the first push, so the stack grows down through the unused tail of the BIOS
+; image rather than into the tables above it.
+STACK	equ	0
+
+	if	$ > 10000h
+	error	"CBIOS overflows the BIOS region"
+	endif
+
+	end

@@ -1,0 +1,11 @@
+# 256 KiB floppy
+diskdef sedna
+  seclen 128
+  tracks 64
+  sectrk 32
+  blocksize 1024
+  maxdir 64
+  skew 1
+  boottrk 2
+  os 2.2
+end
