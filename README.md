@@ -31,3 +31,8 @@ Port `E0h` must be Sedna's device enumeration window. It's the only address the 
 sit wherever, they'll be identified using the enumeration device. Which is what allows dynamic configurations for e.g.
 oc2. `DEVLIB.INC` on the floppy provides the means for guest programs to look for devices and talk to them. `DEVS.COM`
 prints the current list.
+
+## License
+
+Source in this repository is MIT (see `LICENSE`). The boot ROM and floppy image embedding CP/M 2.2's CCP and BDOS are
+covered by the CP/M grant in `external/cpm22/LICENSE.txt` and are not MIT.

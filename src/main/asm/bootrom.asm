@@ -1,3 +1,5 @@
+; MIT licensed, see LICENSE.
+;
 ; Boot ROM for the sedna Z80 board. Shadows the low 8 KiB out of reset, copies the system image
 ; into high RAM and enters the CBIOS, which drops the shadow.
 ;

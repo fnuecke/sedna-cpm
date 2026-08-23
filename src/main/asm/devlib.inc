@@ -1,3 +1,5 @@
+; MIT licensed, see LICENSE.
+;
 ; DEVLIB -- find devices through the sedna enumeration window from a CP/M program.
 ;
 ; Include this in your own source. The window is the one fixed port on the machine; everything

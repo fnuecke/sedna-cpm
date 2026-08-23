@@ -78,6 +78,12 @@ publishing {
                 name = "Sedna CP/M"
                 description = "Prebuilt CP/M 2.2 boot ROM and floppy image for the Sedna emulator's Z80 board."
                 url = "https://github.com/fnuecke/sedna-cpm"
+                licenses {
+                    license {
+                        name = "MIT License"
+                        url = "https://github.com/fnuecke/sedna-cpm/blob/main/LICENSE"
+                    }
+                }
                 developers {
                     developer {
                         id = "fnuecke"

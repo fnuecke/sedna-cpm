@@ -1,3 +1,5 @@
+; MIT licensed, see LICENSE.
+;
 ; DEVS -- list the devices the machine reports through the enumeration window.
 
 	cpu	z80

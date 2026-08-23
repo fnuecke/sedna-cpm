@@ -1,3 +1,5 @@
+; MIT licensed, see LICENSE.
+;
 ; CBIOS for the sedna Z80 board.
 ;
 ; The only address baked in is the device enumeration window. Everything else -- console, boot ROM
