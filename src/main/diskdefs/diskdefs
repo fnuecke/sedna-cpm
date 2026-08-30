@@ -1,10 +1,10 @@
-# 256 KiB floppy
+# 512 KiB floppy, matching oc2's floppy item capacity.
 diskdef sedna
   seclen 128
-  tracks 64
+  tracks 128
   sectrk 32
-  blocksize 1024
-  maxdir 64
+  blocksize 2048
+  maxdir 128
   skew 1
   boottrk 2
   os 2.2

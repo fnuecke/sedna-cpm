@@ -12,7 +12,7 @@ CCP_ORG  := 0E200h
 BDOS_ORG := 0EA00h
 
 .PHONY: all clean
-all: $(BUILD)/bootrom.bin $(BUILD)/cpm.img
+all: $(BUILD)/bootrom.bin $(BUILD)/cpm.img $(BUILD)/geometry.properties
 
 $(BUILD):
 	mkdir -p $(BUILD)
@@ -25,8 +25,25 @@ $(BUILD)/bdos.bin: $(CPM22)/bdos.asm | $(BUILD)
 	asl -D origin=$(BDOS_ORG) -o $(BUILD)/bdos.p -L -OLIST $(BUILD)/bdos.lst $<
 	p2bin -l '$$00' -r '$$EA00-$$F7FF' $(BUILD)/bdos.p
 
-$(BUILD)/cbios.bin: $(ASM)/cbios.asm | $(BUILD)
-	asl -i $(ASM) -o $(BUILD)/cbios.p -L -OLIST $(BUILD)/cbios.lst $<
+# The CBIOS derives its disk parameter block from these, so the DPB, the medium cpmtools formats
+# and the geometry the host hands the controller share a single source of truth.
+$(BUILD)/geometry.inc: $(DISKDEFS) | $(BUILD)
+	awk '/^[ \t]*tracks/{printf "DSKTRK\tequ\t%s\n", $$2} \
+	     /^[ \t]*sectrk/{printf "DSKSEC\tequ\t%s\n", $$2} \
+	     /^[ \t]*seclen/{printf "DSKLEN\tequ\t%s\n", $$2} \
+	     /^[ \t]*blocksize/{printf "DSKBLS\tequ\t%s\n", $$2} \
+	     /^[ \t]*maxdir/{printf "DSKDIR\tequ\t%s\n", $$2} \
+	     /^[ \t]*boottrk/{printf "DSKOFF\tequ\t%s\n", $$2}' $(DISKDEFS) > $@
+
+# Hosts need the same geometry to hand to the disk controller; this is where they read it.
+$(BUILD)/geometry.properties: $(DISKDEFS) | $(BUILD)
+	awk '/^[ \t]*tracks/{printf "tracks=%s\n", $$2} \
+	     /^[ \t]*sectrk/{printf "sectorsPerTrack=%s\n", $$2} \
+	     /^[ \t]*seclen/{printf "sectorSize=%s\n", $$2} \
+	     /^[ \t]*boottrk/{printf "reservedTracks=%s\n", $$2}' $(DISKDEFS) > $@
+
+$(BUILD)/cbios.bin: $(ASM)/cbios.asm $(BUILD)/geometry.inc | $(BUILD)
+	asl -i $(ASM):$(BUILD) -o $(BUILD)/cbios.p -L -OLIST $(BUILD)/cbios.lst $<
 	p2bin -l '$$00' -r '$$F800-$$FFFF' $(BUILD)/cbios.p
 
 $(BUILD)/bootrom.bin: $(ASM)/bootrom.asm $(BUILD)/ccp.bin $(BUILD)/bdos.bin $(BUILD)/cbios.bin

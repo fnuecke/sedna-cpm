@@ -57,7 +57,7 @@ val compileCpm by tasks.registering(Exec::class) {
 tasks.processResources {
     dependsOn(compileCpm)
     from(outputDir) {
-        include("bootrom.bin", "cpm.img")
+        include("bootrom.bin", "cpm.img", "geometry.properties")
         into("generated")
     }
 }
