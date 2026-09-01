@@ -1,9 +1,9 @@
 ; MIT licensed, see LICENSE.
 ;
-; DEVLIB -- find devices through the sedna enumeration window from a CP/M program.
+; DEVLIB -- find devices through the enumeration window device.
 ;
-; Include this in your own source. The window is the one fixed port on the machine; everything
-; else is discovered, so never hardcode a device address.
+; Include this in your own source. The window is the one fixed port on the
+; machine; everything else is discovered, so never hardcode a device address.
 
 BUS	equ	0E0h
 BVER	equ	BUS+0		; format version
@@ -27,7 +27,8 @@ CLSROM	equ	07h
 ; DEVFIND -- locate the B'th device of class C (B is 0-based).
 ; exit  NC, A = port base, E = index
 ;       CY      no such device
-; Use the returned port with IN r,(C) / OUT (C),r; it is not known until run time.
+; Use the returned port with IN r,(C) / OUT (C),r
+; It is not known until run time.
 DEVFIND:
 	in	a,(BCNT)
 	or	a

@@ -19,6 +19,8 @@ public final class Cpm {
         public static final int TRACKS;
         public static final int SECTORS_PER_TRACK;
         public static final int SECTOR_SIZE;
+        public static final int BLOCK_SIZE;
+        public static final int DIRECTORY_ENTRIES;
         public static final int RESERVED_TRACKS;
 
         public static int getImageSize() {
@@ -35,6 +37,8 @@ public final class Cpm {
             TRACKS = value(geometry, "tracks");
             SECTORS_PER_TRACK = value(geometry, "sectorsPerTrack");
             SECTOR_SIZE = value(geometry, "sectorSize");
+            BLOCK_SIZE = value(geometry, "blockSize");
+            DIRECTORY_ENTRIES = value(geometry, "directoryEntries");
             RESERVED_TRACKS = value(geometry, "reservedTracks");
         }
 

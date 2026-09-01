@@ -16,6 +16,7 @@ repositories {
 }
 
 val cpm22Sources = layout.projectDirectory.dir("external/cpm22")
+val hawleyTools = layout.projectDirectory.dir("vendor/hawley")
 val outputDir = layout.buildDirectory.dir("cpm")
 val buildToolchainImage by tasks.registering(Exec::class) {
     description = "Builds the container holding Macro Assembler AS and cpmtools."
@@ -35,11 +36,15 @@ val compileCpm by tasks.registering(Exec::class) {
     inputs.dir("src/main/asm")
     inputs.dir("src/main/diskdefs")
     inputs.dir(cpm22Sources)
+    inputs.dir(hawleyTools)
     outputs.dir(outputDir)
 
     doFirst {
         require(cpm22Sources.file("ccp.asm").asFile.exists()) {
             "external/cpm22 is empty; run `git submodule update --init`."
+        }
+        require(hawleyTools.file("zmac.com").asFile.exists()) {
+            "vendor/hawley is missing the assembler; see its README.md."
         }
     }
 
