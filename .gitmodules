@@ -1,3 +1,6 @@
 [submodule "external/cpm22"]
 	path = external/cpm22
 	url = https://github.com/brouhaha/cpm22.git
+[submodule "external/cpm22-utils"]
+	path = external/cpm22-utils
+	url = https://github.com/ivop/cpm22-from-source.git

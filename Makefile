@@ -6,6 +6,7 @@ BUILD    := build/cpm
 DISKDEFS := src/main/diskdefs/diskdefs
 
 HAWLEY   := vendor/hawley
+UTILS    := external/cpm22-utils
 
 CPMSIZE := $(shell awk '/^[ \t]*tracks/{t=$$2} /^[ \t]*sectrk/{s=$$2} /^[ \t]*seclen/{l=$$2} END{print t*s*l}' src/main/diskdefs/diskdefs)
 
@@ -55,7 +56,13 @@ $(BUILD)/devs.com: $(ASM)/devs.asm $(ASM)/devlib.inc | $(BUILD)
 	p2bin -l '$$00' $(BUILD)/devs.p
 	mv $(BUILD)/devs.bin $@
 
-$(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(HAWLEY)/zmac.com $(HAWLEY)/zml.com | $(BUILD)
+$(BUILD)/ed.com: $(UTILS)/src/ed.plm | $(BUILD)
+	rm -rf $(BUILD)/dri
+	cp -r $(UTILS) $(BUILD)/dri
+	$(MAKE) -C $(BUILD)/dri
+	cp $(BUILD)/dri/bin/ed.com $@
+
+$(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/ed.com $(HAWLEY)/zmac.com $(HAWLEY)/zml.com | $(BUILD)
 	cp $(DISKDEFS) $(BUILD)/diskdefs
 	cd $(BUILD) && mkfs.cpm -f sedna cpm.img
 	cd $(BUILD) && cpmcp -f sedna cpm.img devs.com 0:devs.com
@@ -65,6 +72,7 @@ $(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(HAWLEY)/zmac.com $(HAWLEY)/zml
 	cd $(BUILD) && cpmcp -f sedna cpm.img devlib.inc 0:devlib.inc
 	cd $(BUILD) && cpmcp -f sedna cpm.img ../../$(HAWLEY)/zmac.com 0:zmac.com
 	cd $(BUILD) && cpmcp -f sedna cpm.img ../../$(HAWLEY)/zml.com 0:zml.com
+	cd $(BUILD) && cpmcp -f sedna cpm.img ed.com 0:ed.com
 	cd $(BUILD) && cpmls -f sedna cpm.img
 	@test "$$(stat -c %s $@)" -le "$(CPMSIZE)" \
 	  || { echo "cpm.img is larger than the diskdef geometry allows"; exit 1; }
