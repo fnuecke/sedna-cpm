@@ -8,10 +8,20 @@ DISKDEFS := src/main/diskdefs/diskdefs
 HAWLEY   := vendor/hawley
 UTILS    := external/cpm22-utils
 
-CPMSIZE := $(shell awk '/^[ \t]*tracks/{t=$$2} /^[ \t]*sectrk/{s=$$2} /^[ \t]*seclen/{l=$$2} END{print t*s*l}' src/main/diskdefs/diskdefs)
+CPMSIZE  := $(shell awk '/^[ \t]*tracks/{t=$$2} /^[ \t]*sectrk/{s=$$2} /^[ \t]*seclen/{l=$$2} END{print t*s*l}' $(DISKDEFS))
+BOOTSIZE := $(shell awk '/^[ \t]*boottrk/{b=$$2} /^[ \t]*sectrk/{s=$$2} /^[ \t]*seclen/{l=$$2} END{print b*s*l}' $(DISKDEFS))
+SECLEN   := $(shell awk '/^[ \t]*seclen/{print $$2}' $(DISKDEFS))
 
-CCP_ORG  := 0E200h
-BDOS_ORG := 0EA00h
+MEMMAP   := $(ASM)/memmap.inc
+memhex    = $(shell awk '$$1=="$(1)"{v=$$3; gsub(/\r/,"",v); sub(/h$$/,"",v); print v}' $(MEMMAP))
+memaddr   = $(shell printf '%d' 0x$(call memhex,$(1)))
+
+CCP_ORG  := $(call memhex,CCP)h
+BDOS_ORG := $(call memhex,BDOS)h
+CCP_A    := $(call memaddr,CCP)
+BDOS_A   := $(call memaddr,BDOS)
+BIOS_A   := $(call memaddr,BIOS)
+MEMTOP_A := $(call memaddr,MEMTOP)
 
 .PHONY: all clean
 all: $(BUILD)/bootrom.bin $(BUILD)/cpm.img $(BUILD)/geometry.properties
@@ -19,13 +29,13 @@ all: $(BUILD)/bootrom.bin $(BUILD)/cpm.img $(BUILD)/geometry.properties
 $(BUILD):
 	mkdir -p $(BUILD)
 
-$(BUILD)/ccp.bin: $(CPM22)/ccp.asm | $(BUILD)
+$(BUILD)/ccp.bin: $(CPM22)/ccp.asm $(ASM)/memmap.inc | $(BUILD)
 	asl -D origin=$(CCP_ORG),noserial,noserialize -o $(BUILD)/ccp.p -L -OLIST $(BUILD)/ccp.lst $<
-	p2bin -l '$$00' -r '$$E200-$$E9FF' $(BUILD)/ccp.p
+	p2bin -l '$$00' -r "$(CCP_A)-$$(( $(BDOS_A) - 1 ))" $(BUILD)/ccp.p
 
-$(BUILD)/bdos.bin: $(CPM22)/bdos.asm | $(BUILD)
+$(BUILD)/bdos.bin: $(CPM22)/bdos.asm $(ASM)/memmap.inc | $(BUILD)
 	asl -D origin=$(BDOS_ORG) -o $(BUILD)/bdos.p -L -OLIST $(BUILD)/bdos.lst $<
-	p2bin -l '$$00' -r '$$EA00-$$F7FF' $(BUILD)/bdos.p
+	p2bin -l '$$00' -r "$(BDOS_A)-$$(( $(BIOS_A) - 1 ))" $(BUILD)/bdos.p
 
 $(BUILD)/geometry.inc: $(DISKDEFS) Makefile | $(BUILD)
 	awk '/^[ \t]*tracks/{printf "DSKTRK\tequ\t%s\n", $$2} \
@@ -43,13 +53,22 @@ $(BUILD)/geometry.properties: $(DISKDEFS) Makefile | $(BUILD)
 	     /^[ \t]*maxdir/{printf "directoryEntries=%s\n", $$2} \
 	     /^[ \t]*boottrk/{printf "reservedTracks=%s\n", $$2}' $(DISKDEFS) > $@
 
-$(BUILD)/cbios.bin: $(ASM)/cbios.asm $(BUILD)/geometry.inc | $(BUILD)
+$(BUILD)/cbios.bin: $(ASM)/cbios.asm $(ASM)/memmap.inc $(ASM)/bootdef.inc $(ASM)/wd1793.inc $(ASM)/devlib.inc $(BUILD)/geometry.inc | $(BUILD)
 	asl -i $(ASM):$(BUILD) -o $(BUILD)/cbios.p -L -OLIST $(BUILD)/cbios.lst $<
-	p2bin -l '$$00' -r '$$F800-$$FFFF' $(BUILD)/cbios.p
+	p2bin -l '$$00' -r "$(BIOS_A)-$$(( $(MEMTOP_A) - 1 ))" $(BUILD)/cbios.p
 
-$(BUILD)/bootrom.bin: $(ASM)/bootrom.asm $(BUILD)/ccp.bin $(BUILD)/bdos.bin $(BUILD)/cbios.bin
-	asl -i $(BUILD) -o $(BUILD)/bootrom.p -L -OLIST $(BUILD)/bootrom.lst $<
-	p2bin -l '$$00' -r '$$0000-$$1FFF' $(BUILD)/bootrom.p
+$(BUILD)/bootsec.bin: $(ASM)/bootsec.asm $(ASM)/memmap.inc $(ASM)/bootdef.inc $(BUILD)/geometry.inc | $(BUILD)
+	asl -i $(ASM):$(BUILD) -o $(BUILD)/bootsec.p -L -OLIST $(BUILD)/bootsec.lst $<
+	p2bin -l '$$00' -r "0-$$(( $(SECLEN) - 1 ))" $(BUILD)/bootsec.p
+
+$(BUILD)/bootarea.bin: $(BUILD)/bootsec.bin $(BUILD)/ccp.bin $(BUILD)/bdos.bin $(BUILD)/cbios.bin
+	cat $^ > $@
+	@test "$$(stat -c %s $@)" -le "$(BOOTSIZE)" \
+	  || { echo "boot area is larger than the reserved tracks"; exit 1; }
+
+$(BUILD)/bootrom.bin: $(ASM)/bootrom.asm $(ASM)/bootdef.inc $(ASM)/wd1793.inc $(ASM)/devlib.inc | $(BUILD)
+	asl -i $(ASM) -o $(BUILD)/bootrom.p -L -OLIST $(BUILD)/bootrom.lst $<
+	p2bin -l '$$00' -r '$$0000-$$03FF' $(BUILD)/bootrom.p
 
 $(BUILD)/devs.com: $(ASM)/devs.asm $(ASM)/devlib.inc | $(BUILD)
 	asl -i $(ASM) -o $(BUILD)/devs.p -L -OLIST $(BUILD)/devs.lst $<
@@ -62,9 +81,9 @@ $(BUILD)/ed.com: $(UTILS)/src/ed.plm | $(BUILD)
 	$(MAKE) -C $(BUILD)/dri
 	cp $(BUILD)/dri/bin/ed.com $@
 
-$(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/ed.com $(HAWLEY)/zmac.com $(HAWLEY)/zml.com | $(BUILD)
+$(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/ed.com $(BUILD)/bootarea.bin $(HAWLEY)/zmac.com $(HAWLEY)/zml.com | $(BUILD)
 	cp $(DISKDEFS) $(BUILD)/diskdefs
-	cd $(BUILD) && mkfs.cpm -f sedna cpm.img
+	cd $(BUILD) && mkfs.cpm -f sedna -b bootarea.bin cpm.img
 	cd $(BUILD) && cpmcp -f sedna cpm.img devs.com 0:devs.com
 	# Guest tools need CRLF and terminating 1Ah.
 	sed -e 's/\r$$//' -e 's/$$/\r/' $(ASM)/devlib.inc > $(BUILD)/devlib.inc
