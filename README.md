@@ -4,6 +4,8 @@ CP/M 2.2 for [Sedna](https://github.com/fnuecke/sedna)'s Z80 board.
 
 CCP and BDOS come from [brouhaha/cpm22](https://github.com/brouhaha/cpm22) (see submodule).
 
+ED comes from [ivop/cpm22-from-source](https://github.com/ivop/cpm22-from-source) (see submodule).
+
 The assembler and linker are A.E. Hawley's ZMAC and ZML, committed under `vendor/hawley`.
 
 ## Building
@@ -11,7 +13,7 @@ The assembler and linker are A.E. Hawley's ZMAC and ZML, committed under `vendor
 Requires Docker and a JDK 21.
 
 ```bash
-git submodule update --init
+git submodule update --init --recursive
 ./gradlew build
 ```
 

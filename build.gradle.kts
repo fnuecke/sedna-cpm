@@ -45,8 +45,8 @@ val compileCpm by tasks.registering(Exec::class) {
         require(cpm22Sources.file("ccp.asm").asFile.exists()) {
             "external/cpm22 is empty; run `git submodule update --init`."
         }
-        require(driUtilSources.file("src/ed.plm").asFile.exists()) {
-            "external/cpm22-utils is empty; run `git submodule update --init --recursive`."
+        require(driUtilSources.file("intel80tools/itools/plm80.lib/plm80.lib").asFile.exists()) {
+            "external/cpm22-utils is missing its own submodules; run `git submodule update --init --recursive`."
         }
         require(hawleyTools.file("zmac.com").asFile.exists()) {
             "vendor/hawley is missing the assembler; see its README.md."

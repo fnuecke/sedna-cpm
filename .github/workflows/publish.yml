@@ -30,7 +30,7 @@ jobs:
       - name: Check out sedna-cpm
         uses: actions/checkout@v7
         with:
-          submodules: true
+          submodules: recursive
 
       - name: Set up JDK
         uses: actions/setup-java@v5
