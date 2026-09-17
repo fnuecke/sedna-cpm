@@ -213,6 +213,15 @@ DISCOVER:
 	jr	c,NODEV
 	ld	(UARTB),a
 
+	; A serial card, if one is installed, is the next character device after the console. It
+	; becomes the reader and punch; without one those stay stubs.
+	ld	c,CLSCHR
+	ld	b,1
+	call	DEVFIND
+	jr	c,DISC0
+	ld	(SERP),a
+DISC0:
+
 	; Every block device becomes the next drive letter, in enumeration order. A controller with
 	; several drives reports one entry per drive, distinguished by the unit in the attribute byte.
 	ld	b,0
@@ -331,9 +340,34 @@ PUTS:	ld	a,(hl)
 LISTST:	ld	a,0FFh		; LIST is the console, which is always ready
 	ret
 
-PUNCH:	ret
+; Punch and reader are the serial card. Reader is blocking.
+PUNCH:	ld	a,(SERP)
+	or	a
+	ret	z
+	ld	b,c		; hold the character; C is about to become a port
+	add	a,5
+	ld	c,a
+PUNC1:	in	a,(c)
+	and	LSRTHRE
+	jr	z,PUNC1
+	ld	a,(SERP)
+	ld	c,a
+	out	(c),b
+	ret
 
-READER:	ld	a,1Ah
+READER:	ld	a,(SERP)
+	or	a
+	jr	z,RDREOF
+	add	a,5
+	ld	c,a
+RDRW:	in	a,(c)
+	and	LSRDR
+	jr	z,RDRW
+	ld	a,(SERP)
+	ld	c,a
+	in	a,(c)
+	ret
+RDREOF:	ld	a,1Ah		; no card, so the reader is at end of file
 	ret
 
 ; ---------------------------------------------------------------------- disk
@@ -479,6 +513,7 @@ WRITE1:	ld	a,(hl)
 
 LATCHP:	db	0		; boot ROM latch port
 UARTB:	db	0		; console UART base port
+SERP:	db	0		; serial card base port, zero when none is installed
 FDCB:	db	0		; controller port of the selected drive
 FUNIT:	db	0		; unit of the selected drive on that controller
 DRIVE:	db	0

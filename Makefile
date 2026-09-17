@@ -75,20 +75,29 @@ $(BUILD)/devs.com: $(ASM)/devs.asm $(ASM)/devlib.inc | $(BUILD)
 	p2bin -l '$$00' $(BUILD)/devs.p
 	mv $(BUILD)/devs.bin $@
 
+$(BUILD)/term.com: $(ASM)/term.asm $(ASM)/devlib.inc $(ASM)/serial.inc | $(BUILD)
+	asl -i $(ASM) -o $(BUILD)/term.p -L -OLIST $(BUILD)/term.lst $<
+	p2bin -l '$$00' $(BUILD)/term.p
+	mv $(BUILD)/term.bin $@
+
 $(BUILD)/ed.com: $(UTILS)/src/ed.plm | $(BUILD)
 	rm -rf $(BUILD)/dri
 	cp -r $(UTILS) $(BUILD)/dri
 	$(MAKE) -C $(BUILD)/dri
 	cp $(BUILD)/dri/bin/ed.com $@
 
-$(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/ed.com $(BUILD)/bootarea.bin $(HAWLEY)/zmac.com $(HAWLEY)/zml.com | $(BUILD)
+$(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/term.com $(BUILD)/ed.com $(BUILD)/bootarea.bin $(HAWLEY)/zmac.com $(HAWLEY)/zml.com | $(BUILD)
 	cp $(DISKDEFS) $(BUILD)/diskdefs
 	cd $(BUILD) && mkfs.cpm -f sedna -b bootarea.bin cpm.img
 	cd $(BUILD) && cpmcp -f sedna cpm.img devs.com 0:devs.com
+	cd $(BUILD) && cpmcp -f sedna cpm.img term.com 0:term.com
 	# Guest tools need CRLF and terminating 1Ah.
 	sed -e 's/\r$$//' -e 's/$$/\r/' $(ASM)/devlib.inc > $(BUILD)/devlib.inc
 	printf '\032' >> $(BUILD)/devlib.inc
 	cd $(BUILD) && cpmcp -f sedna cpm.img devlib.inc 0:devlib.inc
+	sed -e 's/\r$$//' -e 's/$$/\r/' $(ASM)/serial.inc > $(BUILD)/serial.inc
+	printf '\032' >> $(BUILD)/serial.inc
+	cd $(BUILD) && cpmcp -f sedna cpm.img serial.inc 0:serial.inc
 	cd $(BUILD) && cpmcp -f sedna cpm.img ../../$(HAWLEY)/zmac.com 0:zmac.com
 	cd $(BUILD) && cpmcp -f sedna cpm.img ../../$(HAWLEY)/zml.com 0:zml.com
 	cd $(BUILD) && cpmcp -f sedna cpm.img ed.com 0:ed.com
