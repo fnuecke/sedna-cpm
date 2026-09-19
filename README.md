@@ -45,11 +45,12 @@ prints the current list.
 | `ZMAC.COM`   | Z80 macro assembler, standard Zilog mnemonics, `INCLUDE` supported |
 | `ZML.COM`    | linker, turns the assembler's output into a program                |
 | `ED.COM`     | Digital Research's line editor                                     |
+| `STAT.COM`   | Digital Research's file and device status                          |
 
 Build a program with `ZMAC PROG` (`PROG.Z80` in, `PROG.REL` out) then `ZML PROG` (`PROG.COM` out).
 `ZMAC` takes `/C` for a console listing and `/H` to emit Intel hex instead.
 
-`ED` is built from Digital Research's own PL/M sources by
+`ED` and `STAT` are built from Digital Research's own PL/M sources by
 [ivop/cpm22-from-source](https://github.com/ivop/cpm22-from-source).
 
 Guest source files have to be stored the way CP/M expects, with CRLF line endings and a `1Ah` after the last one.
@@ -60,5 +61,5 @@ Otherwise, files look like one long line to these tools. `.gitattributes` keeps 
 
 - CP/M 2.2's CCP and BDOS, in the boot ROM and the image: `external/cpm22/LICENSE.txt`.
 - `ZMAC.COM` and `ZML.COM`: `vendor/hawley/README.md`.
-- `ED.COM`: `external/cpm22-utils/LICENSE`.
+- `ED.COM` and `STAT.COM`: `external/cpm22-utils/LICENSE`.
 - `DEVS.COM` and `DEVLIB.INC`: `LICENSE`.

@@ -5,6 +5,7 @@
 	cpu	z80
 	page	0
 
+IOBYTE	equ	0003h
 BDOS	equ	0005h
 DIRECT	equ	6		; direct console i/o, in both directions
 
@@ -16,6 +17,9 @@ GARBLE	equ	'~'
 	ld	b,0
 	call	SEROPEN
 	jr	c,NOCARD
+	ld	a,(IOBYTE)
+	and	3		; CON:=TTY: is the card itself
+	jr	z,ONCARD
 
 	ld	hl,BANNER
 	call	PUTS
@@ -34,6 +38,10 @@ BYE:	ld	hl,CRLF
 	jp	0
 
 NOCARD:	ld	hl,NOSER
+	call	PUTS
+	jp	0
+
+ONCARD:	ld	hl,CONSER
 	call	PUTS
 	jp	0
 
@@ -80,6 +88,7 @@ KEY:	push	bc
 BANNER:	db	'TERM -- ctrl-] quits',0Dh,0Ah,0
 CRLF:	db	0Dh,0Ah,0
 NOSER:	db	'No serial port on this machine.',0Dh,0Ah,0
+CONSER:	db	'The console is on the serial port.',0Dh,0Ah,0
 
 	include	"devlib.inc"
 	include	"serial.inc"

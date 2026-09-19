@@ -80,13 +80,16 @@ $(BUILD)/term.com: $(ASM)/term.asm $(ASM)/devlib.inc $(ASM)/serial.inc | $(BUILD
 	p2bin -l '$$00' $(BUILD)/term.p
 	mv $(BUILD)/term.bin $@
 
-$(BUILD)/ed.com: $(UTILS)/src/ed.plm | $(BUILD)
+$(BUILD)/ed.com: $(UTILS)/src/ed.plm $(UTILS)/src/stat.plm | $(BUILD)
 	rm -rf $(BUILD)/dri
 	cp -r $(UTILS) $(BUILD)/dri
 	$(MAKE) -C $(BUILD)/dri
 	cp $(BUILD)/dri/bin/ed.com $@
 
-$(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/term.com $(BUILD)/ed.com $(BUILD)/bootarea.bin $(HAWLEY)/zmac.com $(HAWLEY)/zml.com | $(BUILD)
+$(BUILD)/stat.com: $(BUILD)/ed.com
+	cp $(BUILD)/dri/bin/stat.com $@
+
+$(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/term.com $(BUILD)/ed.com $(BUILD)/stat.com $(BUILD)/bootarea.bin $(HAWLEY)/zmac.com $(HAWLEY)/zml.com | $(BUILD)
 	cp $(DISKDEFS) $(BUILD)/diskdefs
 	cd $(BUILD) && mkfs.cpm -f sedna -b bootarea.bin cpm.img
 	cd $(BUILD) && cpmcp -f sedna cpm.img devs.com 0:devs.com
@@ -101,6 +104,7 @@ $(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/term.com $(BUILD)/ed.co
 	cd $(BUILD) && cpmcp -f sedna cpm.img ../../$(HAWLEY)/zmac.com 0:zmac.com
 	cd $(BUILD) && cpmcp -f sedna cpm.img ../../$(HAWLEY)/zml.com 0:zml.com
 	cd $(BUILD) && cpmcp -f sedna cpm.img ed.com 0:ed.com
+	cd $(BUILD) && cpmcp -f sedna cpm.img stat.com 0:stat.com
 	cd $(BUILD) && cpmls -f sedna cpm.img
 	@test "$$(stat -c %s $@)" -le "$(CPMSIZE)" \
 	  || { echo "cpm.img is larger than the diskdef geometry allows"; exit 1; }

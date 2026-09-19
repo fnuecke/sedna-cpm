@@ -25,6 +25,7 @@ BDOSE	equ	BDOS+6		; the first six bytes of the BDOS image are its serial number
 WBLEN	equ	BIOS-CCP	; CCP + BDOS only; the BIOS stays resident
 
 IOBYTE	equ	0003h
+IODEF	equ	41h		; CON: and LST: on CRT:, RDR: and PUN: on TTY:
 CDISK	equ	0004h
 
 ; ---------------------------------------------------------------- device registers
@@ -107,8 +108,9 @@ BOOT:	di
 	ld	c,a
 	xor	a
 	out	(c),a
-	ld	(IOBYTE),a
 	ld	(CDISK),a
+	ld	a,IODEF
+	ld	(IOBYTE),a
 	jp	GOCPM
 
 ; Re-reads CCP+BDOS from the boot drive's reserved tracks. On error (typically the system disk
@@ -214,7 +216,7 @@ DISCOVER:
 	ld	(UARTB),a
 
 	; A serial card, if one is installed, is the next character device after the console. It
-	; becomes the reader and punch; without one those stay stubs.
+	; becomes the reader and punch, and the console with CON:=TTY:; without one those stay stubs.
 	ld	c,CLSCHR
 	ld	b,1
 	call	DEVFIND
@@ -288,9 +290,17 @@ NODEV:	di
 
 ; ------------------------------------------------------------------- console
 
-; Returns the UART register at offset A in C.
-UREG:	ld	hl,UARTB
-	add	a,(hl)
+; Returns the console UART register at offset A in C. TTY: is the serial card, CRT: and the rest
+; are the built-in console, which TTY: also falls back to without a card.
+UREG:	ld	c,a
+	ld	a,(IOBYTE)
+	and	3
+	jr	nz,UREG1
+	ld	a,(SERP)
+	or	a
+	jr	nz,UREG2
+UREG1:	ld	a,(UARTB)
+UREG2:	add	a,c
 	ld	c,a
 	ret
 
@@ -324,7 +334,18 @@ CONO1:	in	a,(c)
 	out	(c),b
 	ret
 
-LIST:	jp	CONOUT
+; LST: is CRT:, the built-in console, whatever CON: is.
+LIST:	ld	b,c		; hold the character; C is about to become a port
+	ld	a,(UARTB)
+	add	a,5
+	ld	c,a
+LIST1:	in	a,(c)
+	and	LSRTHRE
+	jr	z,LIST1
+	ld	a,(UARTB)
+	ld	c,a
+	out	(c),b
+	ret
 
 ; Prints the zero-terminated string at HL on the console.
 PUTS:	ld	a,(hl)
@@ -337,7 +358,7 @@ PUTS:	ld	a,(hl)
 	inc	hl
 	jr	PUTS
 
-LISTST:	ld	a,0FFh		; LIST is the console, which is always ready
+LISTST:	ld	a,0FFh		; the built-in console is always ready
 	ret
 
 ; Punch and reader are the serial card. Reader is blocking.
