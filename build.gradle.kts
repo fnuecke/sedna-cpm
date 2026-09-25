@@ -3,7 +3,7 @@ plugins {
     `maven-publish`
 }
 
-val semver: String by project
+val semver = providers.gradleProperty("semver").get()
 val toolchainImage = "sedna-cpm-toolchain:1"
 
 version = semver
@@ -19,7 +19,7 @@ val cpm22Sources = layout.projectDirectory.dir("external/cpm22")
 val hawleyTools = layout.projectDirectory.dir("vendor/hawley")
 val driUtilSources = layout.projectDirectory.dir("external/cpm22-utils")
 val outputDir = layout.buildDirectory.dir("cpm")
-val buildToolchainImage by tasks.registering(Exec::class) {
+val buildToolchainImage = tasks.register<Exec>("buildToolchainImage") {
     description = "Builds the container holding Macro Assembler AS and cpmtools."
     inputs.file("Dockerfile")
     outputs.file(layout.buildDirectory.file("toolchain-image.stamp"))
@@ -29,7 +29,7 @@ val buildToolchainImage by tasks.registering(Exec::class) {
     }
 }
 
-val compileCpm by tasks.registering(Exec::class) {
+val compileCpm = tasks.register<Exec>("compileCpm") {
     description = "Assembles CP/M 2.2 and the CBIOS, and builds the floppy image."
     dependsOn(buildToolchainImage)
 
