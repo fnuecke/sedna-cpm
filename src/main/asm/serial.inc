@@ -17,6 +17,7 @@ SEROPEN:
 	push	hl
 	inc	b		; step over the console
 	ld	c,CLSCHR
+	ld	hl,0
 	call	DEVFIND
 	jr	c,SEROP1
 	ld	(SERPRT),a

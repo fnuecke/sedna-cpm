@@ -38,12 +38,23 @@ ROW:	push	bc
 	call	SPACE
 	xor	a
 	out	(BNAM),a	; rewind the name stream
-NAME:	in	a,(BNAM)
+	in	a,(BNAM)
 	or	a
 	jr	z,ENDROW
-	ld	e,a
+NAME:	ld	e,a
 	ld	c,CONOUT
 	call	BDOS
+	in	a,(BNAM)
+	or	a
+	jr	nz,NAME
+	in	a,(BNAM)	; first byte of the next name, 0 when there is none
+	or	a
+	jr	z,ENDROW
+	push	af
+	ld	de,SEP
+	ld	c,PSTR
+	call	BDOS
+	pop	af
 	jr	NAME
 ENDROW:	ld	de,CRLF
 	ld	c,PSTR
@@ -58,6 +69,7 @@ DONE:	ld	de,FIRSTB
 	call	BDOS
 	ld	c,CLSBLK
 	ld	b,0
+	ld	hl,0
 	call	DEVFIND
 	jr	c,NOBLK
 	call	PHEX
@@ -94,6 +106,7 @@ SPACE:	ld	e,' '
 HEADER:	db	'IX CL PT AT NAME',0Dh,0Ah,'$'
 FIRSTB:	db	'first block device at port $'
 NONE:	db	'(none)$'
+SEP:	db	', $'
 CRLF:	db	0Dh,0Ah,'$'
 
 	include	"devlib.inc"

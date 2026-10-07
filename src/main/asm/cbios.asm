@@ -205,12 +205,14 @@ GOCPM:	ld	a,0C3h
 DISCOVER:
 	ld	c,CLSROM
 	ld	b,0
+	ld	hl,0
 	call	DEVFIND
 	jr	c,NODEV
 	ld	(LATCHP),a
 
 	ld	c,CLSCHR
 	ld	b,0
+	ld	hl,0
 	call	DEVFIND
 	jr	c,NODEV
 	ld	(UARTB),a
@@ -219,6 +221,7 @@ DISCOVER:
 	; becomes the reader and punch, and the console with CON:=TTY:; without one those stay stubs.
 	ld	c,CLSCHR
 	ld	b,1
+	ld	hl,0
 	call	DEVFIND
 	jr	c,DISC0
 	ld	(SERP),a
@@ -229,6 +232,7 @@ DISC0:
 	ld	b,0
 DISC1:	push	bc
 	ld	c,CLSBLK
+	ld	hl,0
 	call	DEVFIND
 	pop	bc
 	jr	c,DISC2

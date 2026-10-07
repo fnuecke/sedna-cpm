@@ -41,6 +41,7 @@ STACK	equ	0E000h
 	ld	(LUARTF),a
 	ld	b,0
 	ld	c,CLSCHR
+	ld	hl,0
 	call	DEVFIND
 	jr	c,SCAN
 	ld	(LUARTB),a
@@ -50,6 +51,7 @@ STACK	equ	0E000h
 SCAN:	ld	b,0			; block device ordinal
 SCAN1:	push	bc
 	ld	c,CLSBLK
+	ld	hl,0
 	call	DEVFIND
 	pop	bc
 	jr	c,NOSYS
