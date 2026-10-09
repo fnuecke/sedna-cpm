@@ -25,8 +25,8 @@ CLSSCRN	equ	06h
 CLSROM	equ	07h
 
 ; DEVFIND -- locate the B'th device of class C (B is 0-based). With HL other
-; than 0, only devices known by the name at HL count (0 terminated; any of a
-; device's names matches).
+; than 0, only devices known by all names in the list at HL count (each 0
+; terminated, an empty one ends the list).
 ; exit  NC, A = port base, E = index, and the device is selected
 ;       CY      no such device, A = device count
 ; Use the returned port with IN r,(C) / OUT (C),r
@@ -63,36 +63,59 @@ DEVFND4:
 	scf
 	ret
 
-; DEVNAME -- check whether the selected device has a name specified at HL (0
+; DEVNAME -- check whether the selected device has every name in the list at
+; HL (each 0 terminated, an empty one ends the list), primary or alias.
+; exit  Z       device has all names.
+;       NZ      device lacks one.
+; Keeps BC, DE and HL.
+DEVNAME:
+	push	hl
+DEVNAM1:
+	ld	a,(hl)
+	or	a
+	jr	z,DEVNAM3	; end of the list, all matched
+	call	DEVHAS
+	jr	nz,DEVNAM3
+DEVNAM2:
+	ld	a,(hl)		; skip to the next name
+	inc	hl
+	or	a
+	jr	nz,DEVNAM2
+	jr	DEVNAM1
+DEVNAM3:
+	pop	hl
+	ret
+
+; DEVHAS -- check whether the selected device has the name at HL (0
 ; terminated), primary or alias.
 ; exit  Z       device has the name.
 ;       NZ      device does not have the name.
 ; Keeps BC, DE and HL.
-DEVNAME:
+DEVHAS:
 	push	hl
 	xor	a
 	out	(BNAM),a	; rewind the name stream
-DEVNAM1:
+DEVHAS1:
 	in	a,(BNAM)	; first byte of the next name
 	or	a
-	jr	z,DEVNAM4	; no names left
+	jr	z,DEVHAS4	; no names left
 	pop	hl
 	push	hl
-DEVNAM2:
+DEVHAS2:
 	cp	(hl)
-	jr	nz,DEVNAM3
+	jr	nz,DEVHAS3
 	or	a		; both ran out at the same place, so it matched
-	jr	z,DEVNAM5
+	jr	z,DEVHAS5
 	inc	hl
 	in	a,(BNAM)
-	jr	DEVNAM2
-DEVNAM3:
+	jr	DEVHAS2
+DEVHAS3:
 	or	a		; skip the rest of this name
-	jr	z,DEVNAM1
+	jr	z,DEVHAS1
 	in	a,(BNAM)
-	jr	DEVNAM3
-DEVNAM4:
+	jr	DEVHAS3
+DEVHAS4:
 	inc	a
-DEVNAM5:
+DEVHAS5:
 	pop	hl
 	ret
