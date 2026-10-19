@@ -89,7 +89,7 @@ $(BUILD)/ed.com: $(UTILS)/src/ed.plm $(UTILS)/src/stat.plm | $(BUILD)
 $(BUILD)/stat.com: $(BUILD)/ed.com
 	cp $(BUILD)/dri/bin/stat.com $@
 
-$(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/term.com $(BUILD)/ed.com $(BUILD)/stat.com $(BUILD)/bootarea.bin $(HAWLEY)/zmac.com $(HAWLEY)/zml.com | $(BUILD)
+$(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/term.com $(BUILD)/ed.com $(BUILD)/stat.com $(BUILD)/bootarea.bin $(HAWLEY)/zmac.com $(HAWLEY)/zml.com $(ASM)/devlib.inc $(ASM)/serial.inc $(ASM)/wd1793.inc $(ASM)/memmap.inc | $(BUILD)
 	cp $(DISKDEFS) $(BUILD)/diskdefs
 	cd $(BUILD) && mkfs.cpm -f sedna -b bootarea.bin cpm.img
 	cd $(BUILD) && cpmcp -f sedna cpm.img devs.com 0:devs.com
@@ -101,6 +101,12 @@ $(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/term.com $(BUILD)/ed.co
 	sed -e 's/\r$$//' -e 's/$$/\r/' $(ASM)/serial.inc > $(BUILD)/serial.inc
 	printf '\032' >> $(BUILD)/serial.inc
 	cd $(BUILD) && cpmcp -f sedna cpm.img serial.inc 0:serial.inc
+	sed -e 's/\r$$//' -e 's/$$/\r/' $(ASM)/wd1793.inc > $(BUILD)/wd1793.inc
+	printf '\032' >> $(BUILD)/wd1793.inc
+	cd $(BUILD) && cpmcp -f sedna cpm.img wd1793.inc 0:wd1793.inc
+	sed -e 's/\r$$//' -e 's/$$/\r/' $(ASM)/memmap.inc > $(BUILD)/memmap.inc
+	printf '\032' >> $(BUILD)/memmap.inc
+	cd $(BUILD) && cpmcp -f sedna cpm.img memmap.inc 0:memmap.inc
 	cd $(BUILD) && cpmcp -f sedna cpm.img ../../$(HAWLEY)/zmac.com 0:zmac.com
 	cd $(BUILD) && cpmcp -f sedna cpm.img ../../$(HAWLEY)/zml.com 0:zml.com
 	cd $(BUILD) && cpmcp -f sedna cpm.img ed.com 0:ed.com
