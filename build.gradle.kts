@@ -19,20 +19,20 @@ val cpm22Sources = layout.projectDirectory.dir("external/cpm22")
 val hawleyTools = layout.projectDirectory.dir("vendor/hawley")
 val driUtilSources = layout.projectDirectory.dir("external/cpm22-utils")
 val outputDir = layout.buildDirectory.dir("cpm")
+val toolchainId = layout.buildDirectory.file("toolchain-image.id")
 val buildToolchainImage = tasks.register<Exec>("buildToolchainImage") {
     description = "Builds the container holding Macro Assembler AS and cpmtools."
     inputs.file("Dockerfile")
-    outputs.file(layout.buildDirectory.file("toolchain-image.stamp"))
-    commandLine("docker", "build", "-q", "-t", toolchainImage, ".")
-    doLast {
-        outputs.files.singleFile.apply { parentFile.mkdirs() }.writeText(toolchainImage)
-    }
+    outputs.file(toolchainId)
+    doFirst { toolchainId.get().asFile.parentFile.mkdirs() }
+    commandLine("docker", "build", "-q", "--iidfile", toolchainId.get().asFile, "-t", toolchainImage, ".")
 }
 
 val compileCpm = tasks.register<Exec>("compileCpm") {
     description = "Assembles CP/M 2.2 and the CBIOS, and builds the floppy image."
     dependsOn(buildToolchainImage)
 
+    inputs.file(toolchainId)
     inputs.file("Makefile")
     inputs.dir("src/main/asm")
     inputs.dir("src/main/diskdefs")

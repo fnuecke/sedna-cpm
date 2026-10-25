@@ -1,11 +1,11 @@
-FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241
+FROM debian:bookworm-slim
 
 # Alfred Arnold's Macro Assembler AS, which cpm22 needs.
 ARG ASL_COMMIT=c7155b4fd3d33110f0eb098dede4295a8c008772
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      build-essential ca-certificates cpmtools=2.23-4 git make \
+      build-essential ca-certificates cpmtools git make \
  && rm -rf /var/lib/apt/lists/*
 
 RUN git init -q /tmp/asl \

@@ -7,6 +7,8 @@ DISKDEFS := src/main/diskdefs/diskdefs
 
 HAWLEY   := vendor/hawley
 UTILS    := external/cpm22-utils
+# Written by Gradle when the toolchain container changes, which then rebuilds everything.
+TOOLCHAIN := $(wildcard build/toolchain-image.id)
 
 CPMSIZE  := $(shell awk '/^[ \t]*tracks/{t=$$2} /^[ \t]*sectrk/{s=$$2} /^[ \t]*seclen/{l=$$2} END{print t*s*l}' $(DISKDEFS))
 BOOTSIZE := $(shell awk '/^[ \t]*boottrk/{b=$$2} /^[ \t]*sectrk/{s=$$2} /^[ \t]*seclen/{l=$$2} END{print b*s*l}' $(DISKDEFS))
@@ -29,11 +31,11 @@ all: $(BUILD)/bootrom.bin $(BUILD)/cpm.img $(BUILD)/geometry.properties
 $(BUILD):
 	mkdir -p $(BUILD)
 
-$(BUILD)/ccp.bin: $(CPM22)/ccp.asm $(ASM)/memmap.inc | $(BUILD)
+$(BUILD)/ccp.bin: $(CPM22)/ccp.asm $(ASM)/memmap.inc $(TOOLCHAIN) | $(BUILD)
 	asl -D origin=$(CCP_ORG),noserial,noserialize -o $(BUILD)/ccp.p -L -OLIST $(BUILD)/ccp.lst $<
 	p2bin -l '$$00' -r "$(CCP_A)-$$(( $(BDOS_A) - 1 ))" $(BUILD)/ccp.p
 
-$(BUILD)/bdos.bin: $(CPM22)/bdos.asm $(ASM)/memmap.inc | $(BUILD)
+$(BUILD)/bdos.bin: $(CPM22)/bdos.asm $(ASM)/memmap.inc $(TOOLCHAIN) | $(BUILD)
 	asl -D origin=$(BDOS_ORG) -o $(BUILD)/bdos.p -L -OLIST $(BUILD)/bdos.lst $<
 	p2bin -l '$$00' -r "$(BDOS_A)-$$(( $(BIOS_A) - 1 ))" $(BUILD)/bdos.p
 
@@ -53,11 +55,11 @@ $(BUILD)/geometry.properties: $(DISKDEFS) Makefile | $(BUILD)
 	     /^[ \t]*maxdir/{printf "directoryEntries=%s\n", $$2} \
 	     /^[ \t]*boottrk/{printf "reservedTracks=%s\n", $$2}' $(DISKDEFS) > $@
 
-$(BUILD)/cbios.bin: $(ASM)/cbios.asm $(ASM)/memmap.inc $(ASM)/bootdef.inc $(ASM)/wd1793.inc $(ASM)/devlib.inc $(BUILD)/geometry.inc | $(BUILD)
+$(BUILD)/cbios.bin: $(ASM)/cbios.asm $(ASM)/memmap.inc $(ASM)/bootdef.inc $(ASM)/wd1793.inc $(ASM)/devlib.inc $(BUILD)/geometry.inc $(TOOLCHAIN) | $(BUILD)
 	asl -i $(ASM):$(BUILD) -o $(BUILD)/cbios.p -L -OLIST $(BUILD)/cbios.lst $<
 	p2bin -l '$$00' -r "$(BIOS_A)-$$(( $(MEMTOP_A) - 1 ))" $(BUILD)/cbios.p
 
-$(BUILD)/bootsec.bin: $(ASM)/bootsec.asm $(ASM)/memmap.inc $(ASM)/bootdef.inc $(BUILD)/geometry.inc | $(BUILD)
+$(BUILD)/bootsec.bin: $(ASM)/bootsec.asm $(ASM)/memmap.inc $(ASM)/bootdef.inc $(BUILD)/geometry.inc $(TOOLCHAIN) | $(BUILD)
 	asl -i $(ASM):$(BUILD) -o $(BUILD)/bootsec.p -L -OLIST $(BUILD)/bootsec.lst $<
 	p2bin -l '$$00' -r "0-$$(( $(SECLEN) - 1 ))" $(BUILD)/bootsec.p
 
@@ -66,21 +68,21 @@ $(BUILD)/bootarea.bin: $(BUILD)/bootsec.bin $(BUILD)/ccp.bin $(BUILD)/bdos.bin $
 	@test "$$(stat -c %s $@)" -le "$(BOOTSIZE)" \
 	  || { echo "boot area is larger than the reserved tracks"; exit 1; }
 
-$(BUILD)/bootrom.bin: $(ASM)/bootrom.asm $(ASM)/bootdef.inc $(ASM)/wd1793.inc $(ASM)/devlib.inc | $(BUILD)
+$(BUILD)/bootrom.bin: $(ASM)/bootrom.asm $(ASM)/bootdef.inc $(ASM)/wd1793.inc $(ASM)/devlib.inc $(TOOLCHAIN) | $(BUILD)
 	asl -i $(ASM) -o $(BUILD)/bootrom.p -L -OLIST $(BUILD)/bootrom.lst $<
 	p2bin -l '$$00' -r '$$0000-$$03FF' $(BUILD)/bootrom.p
 
-$(BUILD)/devs.com: $(ASM)/devs.asm $(ASM)/devlib.inc | $(BUILD)
+$(BUILD)/devs.com: $(ASM)/devs.asm $(ASM)/devlib.inc $(TOOLCHAIN) | $(BUILD)
 	asl -i $(ASM) -o $(BUILD)/devs.p -L -OLIST $(BUILD)/devs.lst $<
 	p2bin -l '$$00' $(BUILD)/devs.p
 	mv $(BUILD)/devs.bin $@
 
-$(BUILD)/term.com: $(ASM)/term.asm $(ASM)/devlib.inc $(ASM)/serial.inc | $(BUILD)
+$(BUILD)/term.com: $(ASM)/term.asm $(ASM)/devlib.inc $(ASM)/serial.inc $(TOOLCHAIN) | $(BUILD)
 	asl -i $(ASM) -o $(BUILD)/term.p -L -OLIST $(BUILD)/term.lst $<
 	p2bin -l '$$00' $(BUILD)/term.p
 	mv $(BUILD)/term.bin $@
 
-$(BUILD)/ed.com: $(UTILS)/src/ed.plm $(UTILS)/src/stat.plm | $(BUILD)
+$(BUILD)/ed.com: $(UTILS)/src/ed.plm $(UTILS)/src/stat.plm $(TOOLCHAIN) | $(BUILD)
 	rm -rf $(BUILD)/dri
 	cp -r $(UTILS) $(BUILD)/dri
 	$(MAKE) -C $(BUILD)/dri
@@ -89,7 +91,7 @@ $(BUILD)/ed.com: $(UTILS)/src/ed.plm $(UTILS)/src/stat.plm | $(BUILD)
 $(BUILD)/stat.com: $(BUILD)/ed.com
 	cp $(BUILD)/dri/bin/stat.com $@
 
-$(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/term.com $(BUILD)/ed.com $(BUILD)/stat.com $(BUILD)/bootarea.bin $(HAWLEY)/zmac.com $(HAWLEY)/zml.com $(ASM)/devlib.inc $(ASM)/serial.inc $(ASM)/wd1793.inc $(ASM)/memmap.inc | $(BUILD)
+$(BUILD)/cpm.img: $(DISKDEFS) $(BUILD)/devs.com $(BUILD)/term.com $(BUILD)/ed.com $(BUILD)/stat.com $(BUILD)/bootarea.bin $(HAWLEY)/zmac.com $(HAWLEY)/zml.com $(ASM)/devlib.inc $(ASM)/serial.inc $(ASM)/wd1793.inc $(ASM)/memmap.inc $(TOOLCHAIN) | $(BUILD)
 	cp $(DISKDEFS) $(BUILD)/diskdefs
 	cd $(BUILD) && mkfs.cpm -f sedna -b bootarea.bin cpm.img
 	cd $(BUILD) && cpmcp -f sedna cpm.img devs.com 0:devs.com
